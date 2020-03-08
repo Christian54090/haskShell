@@ -30,9 +30,6 @@ stripJust (Just a) = Right a
 trim :: String -> String
 trim = dropWhileEnd isSpace . dropWhile isSpace
 
-upCase :: String -> String
-upCase = map toUpper
-
 takeN :: Int -> [a] -> [Maybe a]
 takeN 0 xs = []
 takeN n [] = [Nothing] ++ takeN (n-1) []
@@ -45,6 +42,8 @@ execute (cmd:args) =
     (Just "mv") -> mv args
     (Just "rm") -> rm args
     (Just "touch") -> touch args
+    (Just "rmdir") -> rmdir args
+    (Just "mkdir") -> mkdir args
     _           -> putStrLn "error: unrecognized command"
 
 cd :: [Maybe FilePath] -> IO ()
@@ -77,3 +76,19 @@ touch (Nothing:_)  = putStrLn "touch: missing file operand"
 touch ((Just p):_) = do
   h <- openFile p AppendMode
   hClose h
+
+rmdir :: [Maybe FilePath] -> IO ()
+rmdir (path:_) =
+  case path of
+    Nothing  -> putStrLn "rmdir: missing file operand"
+    (Just p) -> catch (removeDirectory p) handler
+      where handler :: SomeException -> IO ()
+            handler ex = putStrLn $ "rmdir: failed to remove '" ++ p ++ "': No such directory"
+
+mkdir :: [Maybe FilePath] -> IO ()
+mkdir (path:_) =
+  case path of
+    Nothing  -> putStrLn "mkdir: missing file operand"
+    (Just p) -> catch (createDirectory p) handler
+      where handler :: SomeException -> IO ()
+            handler ex = putStrLn "rmdir: directory already exists"
