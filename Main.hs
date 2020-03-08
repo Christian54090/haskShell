@@ -1,6 +1,7 @@
 import System.Directory
 import System.FilePath
 import Control.Exception
+import System.IO
 import Data.List (dropWhileEnd)
 import Data.Char (isSpace, toUpper)
 
@@ -42,6 +43,9 @@ execute (cmd:args) =
   case cmd of
     (Just "cd") -> cd args
     (Just "mv") -> mv args
+    (Just "rm") -> rm args
+    (Just "touch") -> touch args
+    _           -> putStrLn "error: unrecognized command"
 
 cd :: [Maybe FilePath] -> IO ()
 cd ((Just p):xs) = catch (setCurrentDirectory p) handler
@@ -52,10 +56,24 @@ cd (Nothing:xs)  = do
   setCurrentDirectory path
 
 mv :: [Maybe FilePath] -> IO ()
-mv args@(old:new:_) =
+mv (old:new:_) =
   case (stripJust old, stripJust new) of
     (Left _,_)         -> putStrLn "mv: missing file operand"
     (_,Left _)         -> putStrLn "mv: missing file operand"
     (Right o, Right n) -> catch (renameFile o n) handler
       where handler :: SomeException -> IO ()
             handler ex = putStrLn "mv: one or more files or directories mentioned do not exist"
+
+rm :: [Maybe FilePath] -> IO ()
+rm (path:_) =
+  case (stripJust path) of
+    (Left _)  -> putStrLn "rm: missing file operand"
+    (Right p) -> catch (removeFile p) handler
+      where handler :: SomeException -> IO ()
+            handler ex = putStrLn $ "rm: cannot remove '" ++ p ++ "': No such file"
+
+touch :: [Maybe FilePath] -> IO ()
+touch (Nothing:_)  = putStrLn "touch: missing file operand"
+touch ((Just p):_) = do
+  h <- openFile p AppendMode
+  hClose h
