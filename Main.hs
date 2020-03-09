@@ -12,7 +12,7 @@ mainloop :: IO FilePath -> IO ()
 mainloop p = do
   path <- p
   setCurrentDirectory path
-  putStr $ path ++ "$ "
+  formattedPath >>= putStr
 
   input <- getLine
   let args = takeN 3 $ words input
@@ -30,6 +30,12 @@ stripJust (Just a) = Right a
 trim :: String -> String
 trim = dropWhileEnd isSpace . dropWhile isSpace
 
+formattedPath :: IO FilePath
+formattedPath = do
+  home <- getHomeDirectory
+  current <- getCurrentDirectory
+  return $ "~" ++ drop (length home) current ++ "$ "
+
 takeN :: Int -> [a] -> [Maybe a]
 takeN 0 xs = []
 takeN n [] = [Nothing] ++ takeN (n-1) []
@@ -44,6 +50,9 @@ execute (cmd:args) =
     (Just "touch") -> touch args
     (Just "rmdir") -> rmdir args
     (Just "mkdir") -> mkdir args
+    (Just "ls") -> ls args
+    (Just "cat") -> cat args
+    (Nothing) -> putStr ""
     _           -> putStrLn "error: unrecognized command"
 
 cd :: [Maybe FilePath] -> IO ()
@@ -61,7 +70,7 @@ mv (old:new:_) =
     (_,Left _)         -> putStrLn "mv: missing file operand"
     (Right o, Right n) -> catch (renameFile o n) handler
       where handler :: SomeException -> IO ()
-            handler ex = putStrLn "mv: one or more files or directories mentioned do not exist"
+            handler ex = putStrLn "mv: one or more files or directories stated do not exist"
 
 rm :: [Maybe FilePath] -> IO ()
 rm (path:_) =
@@ -92,3 +101,23 @@ mkdir (path:_) =
     (Just p) -> catch (createDirectory p) handler
       where handler :: SomeException -> IO ()
             handler ex = putStrLn "rmdir: directory already exists"
+
+ls :: [Maybe FilePath] -> IO ()
+ls ((Just p):_) = do
+  listResult <- try (listDirectory p) :: IO (Either SomeException [FilePath])
+  case listResult of
+    Left ex -> putStrLn $ "ls: cannot access '" ++ p ++ "': No such file or directory"
+    Right l -> mapM_ putStrLn $ filter (\e -> head e /= '.') l
+ls (Nothing:_) = do
+  path <- getCurrentDirectory
+  list <- listDirectory path
+  mapM_ putStrLn $ filter (\e -> head e /= '.') list
+
+cat :: [Maybe FilePath] -> IO ()
+cat (Nothing:_) = putStrLn "cat: missing file operand"
+cat (Just p:_)  = do
+  fileExists <- doesFileExist p
+  case fileExists of
+    False -> putStrLn "cat: file does not exist"
+    True  -> do file <- readFile p
+                putStr file

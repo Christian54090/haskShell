@@ -1,1 +1,6 @@
 hello this is a non-empty file
+
+and this
+is testing
+if
+cat works
